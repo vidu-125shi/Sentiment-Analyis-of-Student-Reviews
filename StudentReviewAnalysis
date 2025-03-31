@@ -1,0 +1,149 @@
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import re
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score,precision_score, recall_score, f1_score, classification_report
+from wordcloud import WordCloud
+
+import nltk
+nltk.download('stopwords')
+
+print(stopwords.words('english'))
+
+student_data= pd.read_excel('/content/Reviews.xlsx')
+
+#print first 5 rows
+student_data.head()
+
+"""Cleaning of Data"""
+
+#check for missing values
+student_data.isnull().sum()
+
+student_data.dropna(inplace=True)
+
+student_data['rating'].value_counts()
+
+student_data['rating'].value_counts().plot.bar(color = 'blue')
+plt.title('Rating Distribution Count')
+plt.xlabel('Ratings')
+plt.ylabel('Count')
+plt.show()
+
+student_data['True_Sentiment'] = np.where(student_data['rating'] ==5, 'Positive',np.where(student_data['rating'] == 1, 'Negative',np.where(student_data['rating'] == 4, 'Positive',np.where(student_data['rating'] == 2, 'Negative','Neutral'))))
+student_data.head(5)
+
+student_data.replace({'rating':{2:1}}, inplace=True)
+
+student_data.replace({'rating':{4:2}}, inplace=True)
+student_data.replace({'rating':{5:2}}, inplace=True)
+
+student_data['rating'].value_counts()
+
+student_data['rating'].value_counts().plot.bar(color = 'blue')
+plt.title('Rating Distribution Count')
+plt.xlabel('Ratings')
+plt.ylabel('Count')
+plt.show()
+
+student_data['Sentiment'] = np.where(student_data['rating'] ==2, 'Positive',np.where(student_data['rating'] == 1, 'Negative','Neutral'))
+student_data.head(5)
+
+reviews = " ".join([review for review in student_data['reviews']])
+wc = WordCloud(background_color = 'white', max_words=50)
+plt.figure(figsize=(10,10))
+plt.imshow(wc.generate(reviews))
+plt.title('WorldCloud for all reviews',fontsize=10)
+plt.axis('off')
+plt.show()
+
+"""Stemming the data"""
+
+port_stem = PorterStemmer()
+
+def stemming_data(content):
+  stemmed_cont = re.sub('[^a-zA-Z]',' ', content)
+  stemmed_cont = stemmed_cont.lower()
+
+  stemmed_cont = stemmed_cont.split()
+  stemmed_cont = [port_stem.stem(word) for word in stemmed_cont if not word in stopwords.words('english')]
+  stemmed_cont = ' '.join(stemmed_cont)
+
+  return stemmed_cont
+
+student_data['stemmed_reviews'] = student_data['reviews'].apply(stemming_data)
+
+student_data.head()
+
+print(student_data['stemmed_reviews'])
+
+# seprating the data and the label
+X = student_data['stemmed_reviews'].values
+Y = student_data['rating'].values
+
+print(X)
+
+print(Y)
+
+"""Splitting Data"""
+
+#splitting data into training and test data
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, stratify = Y,random_state=2)
+
+print(X.shape, X_train.shape, X_test.shape)
+
+print(X_train)
+
+print(X_test)
+
+"""Vectorizing Data"""
+
+# converting textual data to numerical data
+vectorizer = TfidfVectorizer()
+X_train = vectorizer.fit_transform(X_train)
+X_test = vectorizer.transform(X_test)
+
+print(X_train)
+
+"""Training Model
+
+"""
+
+#training the ml model(logistic regression)
+
+model = LogisticRegression(max_iter = 1000)
+
+model.fit(X_train,Y_train)
+
+#accuracy score on the test data
+
+X_prediction = model.predict(X_test)
+test_data_accuracy = accuracy_score(Y_test,X_prediction)
+
+print('Accuracy ',test_data_accuracy)
+
+#result of analysis
+print('Accuracy ',test_data_accuracy)
+print("Classification Report:\n",classification_report(Y_test,X_prediction,target_names=['Negative', 'Positive', 'Neutral']))
+
+"""Predict on new Data"""
+
+#input new review
+review_new = ["i love this course","Waste of time!!"]
+
+review_new_cleaned = [stemming_data(review) for review in review_new]
+review_new_vectorized = vectorizer.transform(review_new_cleaned)
+prediction = model.predict(review_new_vectorized)
+#print prediction
+print(prediction)
+
+for i in range(5):
+  print(f" 'review': {student_data.iloc[i]['reviews']}")
+  print(f" 'sentiment' : {student_data.iloc[i]['Sentiment']}")
+
